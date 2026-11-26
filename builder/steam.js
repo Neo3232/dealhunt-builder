@@ -30,5 +30,5 @@ async function worker() {
     if (ok && Object.keys(out).length) { if (await putJSON('st:' + cc, out)) written++; } else { failed++; console.log('failed', cc); }
   }
 }
-await Promise.all([worker(), worker(), worker()]);
+await Promise.all([worker(), worker()]);
 console.log('steam written', written, 'failed', failed);
