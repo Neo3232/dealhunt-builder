@@ -3,26 +3,36 @@ on:
   workflow_dispatch:
     inputs:
       job:
-        description: feed, deep or country
+        description: feed, deep, country or steam
         default: feed
   schedule:
     - cron: '17 */6 * * *'
 concurrency:
-  group: refresh-${{ github.event.inputs.job || 'feed' }}
+  group: refresh
   cancel-in-progress: false
 jobs:
   run:
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    env:
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+      CF_KV_ID: ${{ secrets.CF_KV_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+      JOB: ${{ github.event.inputs.job || 'feed' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Run
-        env:
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
-          CF_KV_ID: ${{ secrets.CF_KV_ID }}
-          JOB: ${{ github.event.inputs.job || 'feed' }}
-        run: node builder/${JOB}.js
+      - name: Refresh data
+        run: |
+          case "$JOB" in
+            feed) node builder/feed.js; node builder/offers.js ;;
+            *) node builder/$JOB.js ;;
+          esac
+      - name: Write static files
+        run: node builder/export.js
+      - name: Publish
+        run: npx -y wrangler@4 deploy
