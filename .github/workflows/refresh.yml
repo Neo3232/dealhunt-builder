@@ -1,0 +1,28 @@
+name: refresh
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: feed, deep or country
+        default: feed
+  schedule:
+    - cron: '17 */6 * * *'
+concurrency:
+  group: refresh-${{ github.event.inputs.job || 'feed' }}
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_KV_ID: ${{ secrets.CF_KV_ID }}
+          JOB: ${{ github.event.inputs.job || 'feed' }}
+        run: node builder/${JOB}.js
