@@ -4,14 +4,11 @@ jobs:
   u:
     runs-on: ubuntu-latest
     steps:
-      - name: KV operations by type (counts only)
+      - name: KV operations by hour and type (counts only)
         env:
           T: ${{ secrets.CF_API_TOKEN }}
           A: ${{ secrets.CF_ACCOUNT_ID }}
-          N: ${{ secrets.CF_KV_ID }}
         run: |
-          for D in $(date -u +%F) $(date -u -d yesterday +%F); do
-          echo "== $D (UTC)"
-          Q=$(jq -n --arg a "$A" --arg d "$D" '{query:"query($a:String!,$s:Date!,$e:Date!){viewer{accounts(filter:{accountTag:$a}){kvOperationsAdaptiveGroups(limit:50,filter:{date_geq:$s,date_leq:$e}){sum{requests} dimensions{actionType namespaceId}}}}}",variables:{a:$a,s:$d,e:$d}}')
-          curl -s https://api.cloudflare.com/client/v4/graphql -H "Authorization: Bearer $T" -H 'Content-Type: application/json' -d "$Q" | jq -c '.errors, (.data.viewer.accounts[0].kvOperationsAdaptiveGroups // [] | map({a:.dimensions.actionType,n:.sum.requests}))'
-          done
+          S=$(date -u -d '30 hours ago' +%FT%TZ); E=$(date -u +%FT%TZ); echo "now $E"
+          Q=$(jq -n --arg a "$A" --arg s "$S" --arg e "$E" '{query:"query($a:String!,$s:Time!,$e:Time!){viewer{accounts(filter:{accountTag:$a}){kvOperationsAdaptiveGroups(limit:1000,orderBy:[datetimeHour_ASC],filter:{datetime_geq:$s,datetime_leq:$e}){sum{requests} dimensions{actionType datetimeHour}}}}}",variables:{a:$a,s:$s,e:$e}}')
+          curl -s https://api.cloudflare.com/client/v4/graphql -H "Authorization: Bearer $T" -H 'Content-Type: application/json' -d "$Q" | jq -r '.errors, (.data.viewer.accounts[0].kvOperationsAdaptiveGroups // [] | .[] | "\(.dimensions.datetimeHour) \(.dimensions.actionType) \(.sum.requests)")'
